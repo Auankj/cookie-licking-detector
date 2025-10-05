@@ -1,0 +1,40 @@
+{
+  "action": "created",
+  "issue": {
+    "id": 1234567890,
+    "number": 42,
+    "title": "Add new feature for user authentication",
+    "body": "We need to implement user authentication with JWT tokens.",
+    "user": {
+      "login": "maintainer-user",
+      "id": 12345678
+    },
+    "state": "open",
+    "created_at": "2024-10-04T21:00:00Z",
+    "updated_at": "2024-10-04T21:00:00Z"
+  },
+  "comment": {
+    "id": 987654321,
+    "body": "I'll take this issue and implement the JWT authentication system. This looks like a great addition to the project!",
+    "user": {
+      "login": "test-contributor",
+      "id": 87654321
+    },
+    "created_at": "2024-10-04T21:22:00Z"
+  },
+  "repository": {
+    "id": 776677001,
+    "name": "awesome-project",
+    "full_name": "test-org/awesome-project",
+    "owner": {
+      "login": "test-org",
+      "id": 11223344
+    },
+    "html_url": "https://github.com/test-org/awesome-project",
+    "private": false
+  },
+  "sender": {
+    "login": "test-contributor",
+    "id": 87654321
+  }
+}
