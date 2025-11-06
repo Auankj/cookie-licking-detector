@@ -7,7 +7,7 @@ import secrets
 from functools import lru_cache
 from typing import Optional, List, Any
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     Production application settings with environment-based configuration
     All settings are validated and type-safe
     """
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
     
     # Application Settings
     APP_NAME: str = Field(default="Cookie-Licking Detector", env="APP_NAME")
@@ -92,6 +99,12 @@ class Settings(BaseSettings):
     )
     ALLOWED_METHODS: List[str] = Field(default=["GET", "POST", "PUT", "DELETE"], env="ALLOWED_METHODS")
     ALLOWED_HEADERS: List[str] = Field(default=["*"], env="ALLOWED_HEADERS")
+    
+    # Trusted Host Settings (hostnames only, no schemes)
+    ALLOWED_HOSTS: List[str] = Field(
+        default=["localhost", "127.0.0.1"],
+        env="ALLOWED_HOSTS"
+    )
     
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = Field(default=100, env="RATE_LIMIT_PER_MINUTE")

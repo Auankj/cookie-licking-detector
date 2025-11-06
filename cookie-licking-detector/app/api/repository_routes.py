@@ -14,7 +14,8 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from app.db.database import get_async_session
-from app.db.models import Repository
+from app.db.models import Repository, User
+from app.core.security import get_current_user
 
 router = APIRouter()
 
@@ -46,6 +47,8 @@ class RepositoryResponse(BaseModel):
     nudge_count: int
     claim_detection_threshold: int
     notification_settings: Optional[dict] = {}
+    total_issues: int = 0
+    active_claims_count: int = 0
     created_at: datetime
     updated_at: datetime
     
@@ -55,7 +58,8 @@ class RepositoryResponse(BaseModel):
 @router.post("/repositories", response_model=RepositoryResponse)
 async def register_repository(
     repo_data: RepositoryCreate,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Register a new repository for monitoring
@@ -130,6 +134,9 @@ async def list_repositories(
     List monitored repositories
     As specified in MD file: GET /api/repositories
     """
+    from sqlalchemy import func
+    from app.db.models.issues import Issue
+    from app.db.models.claims import Claim, ClaimStatus
     
     stmt = select(Repository)
     
@@ -144,7 +151,43 @@ async def list_repositories(
     result = await db.execute(stmt)
     repositories = result.scalars().all()
     
-    return repositories
+    # Enrich with counts
+    enriched_repos = []
+    for repo in repositories:
+        # Count total issues
+        issues_stmt = select(func.count(Issue.id)).where(Issue.repository_id == repo.id)
+        issues_result = await db.execute(issues_stmt)
+        total_issues = issues_result.scalar() or 0
+        
+        # Count active claims
+        claims_stmt = select(func.count(Claim.id)).where(
+            Claim.repository_id == repo.id,
+            Claim.status == ClaimStatus.ACTIVE
+        )
+        claims_result = await db.execute(claims_stmt)
+        active_claims = claims_result.scalar() or 0
+        
+        # Create response dict
+        repo_dict = {
+            "id": repo.id,
+            "github_repo_id": repo.github_repo_id,
+            "owner_name": repo.owner_name,
+            "name": repo.name,
+            "full_name": repo.full_name,
+            "url": repo.url,
+            "is_monitored": repo.is_monitored,
+            "grace_period_days": repo.grace_period_days,
+            "nudge_count": repo.nudge_count,
+            "claim_detection_threshold": repo.claim_detection_threshold,
+            "notification_settings": repo.notification_settings or {},
+            "total_issues": total_issues,
+            "active_claims_count": active_claims,
+            "created_at": repo.created_at,
+            "updated_at": repo.updated_at
+        }
+        enriched_repos.append(repo_dict)
+    
+    return enriched_repos
 
 @router.put("/repositories/{repo_id}", response_model=RepositoryResponse)
 async def update_repository(
