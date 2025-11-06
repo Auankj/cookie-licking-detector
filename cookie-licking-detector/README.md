@@ -1,304 +1,479 @@
-# 🍪 Cookie-Licking Detector
+# 🍪 Cookie Licking Detector
 
-**An intelligent system to detect and manage stale issue claims in GitHub repositories**
+**Automatically detect and manage stale GitHub issue claims to keep your open source project healthy**
 
-> "Cookie-licking" refers to users who claim GitHub issues but never follow through, blocking others from contributing. This system automatically detects such behavior and takes corrective action.
+> "Cookie-licking" is when someone claims a GitHub issue but never follows through, blocking other contributors. This system detects claim patterns in issue comments and automatically tracks, nudges, and releases stale claims.
 
----
-
-## 🚀 Hackathon Demo
-
-This project implements all features specified in the comprehensive project documentation, including:
-
-### ✨ Key Features Implemented
-
-- **🧠 Multi-Level Pattern Matching**: 95% confidence for direct claims, 90% for assignment requests, 70% for questions
-- **🔐 Distributed Locking**: Redis-based locks prevent concurrent processing conflicts
-- **⚡ Atomic Transactions**: INSERT claim + activity_log + schedule job in single transaction
-- **📊 Progress Monitoring**: Tracks PRs, commits, and user activity to reset timers
-- **📧 Smart Notifications**: Polite email and GitHub comment nudges using SendGrid
-- **🤖 Auto-Release**: Automatically releases stale claims after grace period
-- **📈 Analytics Dashboard**: Comprehensive metrics and repository insights
-- **🎯 Context Analysis**: +10% confidence boost for maintainer replies
-
-### 🏗️ Architecture Highlights
-
-- **FastAPI** REST API with comprehensive endpoints
-- **PostgreSQL** with optimized schema and indexes
-- **Redis** for distributed locking and queues
-- **Celery** for background job processing
-- **Ecosyste.ms API** integration with 60 req/min rate limiting
-- **GitHub API** integration for assignments and comments
-- **SendGrid** email service integration
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
 ---
 
-## 🎪 Quick Demo Setup
+## 🎯 What Problem Does This Solve?
+
+Open source maintainers often face "cookie lickers" - contributors who claim issues with comments like "I'll work on this!" but never submit a PR. This blocks other contributors and creates frustration.
+
+**Cookie Licking Detector** automatically:
+- ✅ Detects claim patterns in issue comments with 95% confidence
+- ✅ Tracks claim activity and monitors progress  
+- ✅ Sends polite nudges after configurable grace periods (default: 7 days)
+- ✅ Auto-releases stale claims so others can contribute
+- ✅ Provides analytics on claim patterns and contributor behavior
+
+---
+
+## ✨ Features
+
+### 🧠 Intelligent Pattern Detection
+- **Multi-level confidence scoring**: 95% for direct claims ("I'll take this"), 90% for assignments ("Please assign to me"), 70% for questions
+- **Context-aware analysis**: Boosts confidence when maintainers reply
+- **False positive prevention**: Ignores comments like "This looks interesting"
+
+### 📊 Claim Lifecycle Management
+- **Automatic tracking**: Detects claims from GitHub webhook events
+- **Progress monitoring**: Tracks linked PRs and commits
+- **Grace period system**: Configurable timeframes before nudging (default: 7 days)
+- **Smart notifications**: Polite email and GitHub comment reminders
+- **Auto-release**: Frees up issues after multiple failed nudges
+
+### 🎨 Web Dashboard
+- **Real-time stats**: Active claims, repository health, contributor metrics
+- **Repository management**: Register and monitor multiple GitHub repos
+- **Claim insights**: View all claims with status, confidence scores, and timelines
+- **User analytics**: Track contributor patterns and reliability
+
+### 🏗️ Production-Ready Architecture
+- **FastAPI** backend with async/await support
+- **PostgreSQL** database with optimized indexes
+- **Redis** for job queues and distributed locking
+- **Celery** for background task processing
+- **GitHub webhooks** for real-time event processing
+- **SendGrid** integration for email notifications
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Git
 
-### 1. Clone Repository
+- **Python 3.11+**
+- **PostgreSQL 14+**
+- **Redis 6+**
+- **GitHub Personal Access Token** ([Create one here](https://github.com/settings/tokens))
+- **SendGrid API Key** (optional, for email notifications)
+
+### 1️⃣ Clone the Repository
+
 ```bash
-git clone https://github.com/your-org/cookie-licking-detector.git
+git clone https://github.com/auankj/cookie-licking-detector.git
 cd cookie-licking-detector
 ```
 
-### 2. Environment Setup
+### 2️⃣ Set Up Environment
+
 ```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env file
 cp .env.example .env
-# Edit .env with your GitHub token, SendGrid API key, etc.
 ```
 
-### 3. Start Development Environment
-```bash
-make dev
-# OR
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-```
-
-### 4. Access Application
-- **API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **pgAdmin**: http://localhost:8080 (admin@example.com / admin)
-- **Redis Commander**: http://localhost:8081
-- **Flower (Celery)**: http://localhost:5555
-
-### 5. Initialize Database
-```bash
-# Run migrations
-make migrate
-
-# Seed with demo data (optional)
-make seed
-```
-
----
-
-## 🚀 Production Deployment
-
-### Automated Deployment
-```bash
-# Configure production environment
-cp .env.example .env
-# Edit with production values
-
-# Deploy with automated script
-./deploy.sh deploy
-```
-
-### Manual Production Setup
-```bash
-# Build production images
-make build-prod
-
-# Start production environment
-make prod
-# OR
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-```
-
-### Production Services
-- **API**: http://your-domain.com
-- **Monitoring**: http://your-domain.com:9090 (Prometheus)
-- **Admin Tools**: http://your-domain.com:8080 (pgAdmin)
-- **SSL**: Configured via Nginx with Let's Encrypt
-
----
-
-## 🔧 Development Guide
-
-### Common Commands
+**Edit `.env` with your configuration:**
 
 ```bash
-# Development environment
-make dev                 # Start development environment
-make dev-detach         # Start in background
+# Database
+DATABASE_URL=postgresql+asyncpg://your_user:your_password@localhost/cookie_detector
 
-# Testing
-make test               # Run test suite
-make test-ci            # Run CI tests with coverage
+# Redis
+REDIS_URL=redis://localhost:6379/0
 
-# Code quality
-make lint               # Run linting checks
-make format             # Format code with Black/isort
-make security           # Run security scans
+# GitHub
+GITHUB_TOKEN=ghp_your_github_personal_access_token
 
-# Database operations
-make migrate            # Run database migrations
-make migrate-create     # Create new migration
-make seed               # Seed with test data
+# SendGrid (optional)
+SENDGRID_API_KEY=SG.your_sendgrid_api_key
+SENDGRID_FROM_EMAIL=noreply@yourdomain.com
 
-# Monitoring
-make logs               # View application logs
-make logs-celery        # View Celery logs
-make monitor            # Open monitoring interfaces
-
-# Cleanup
-make clean              # Remove containers and volumes
-make clean-all          # Remove everything including images
+# Security
+SECRET_KEY=your_secret_key_here
 ```
 
-### Development Workflow
+### 3️⃣ Initialize Database
 
-1. **Start development environment**
-   ```bash
-   make dev
-   ```
+```bash
+# Run Alembic migrations
+alembic upgrade head
 
-2. **Make your changes**
-   - Backend code in `app/`
-   - Database models in `app/db/models/`
-   - API routes in `app/api/`
-   - Background tasks in `app/tasks/`
+# Create a test user (optional)
+python create_test_user.py
+```
 
-3. **Test your changes**
-   ```bash
-   make test
-   make lint
-   ```
+### 4️⃣ Start Services
 
-4. **Create database migrations**
-   ```bash
-   make migrate-create
-   ```
+**Terminal 1 - API Server:**
+```bash
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
-5. **Access development tools**
-   - Shell: `make shell`
-   - Database: `make db-shell`
-   - Redis: `make redis-shell`
+**Terminal 2 - Celery Worker:**
+```bash
+python3 -m celery -A app.core.celery_app worker --loglevel=info
+```
+
+**Terminal 3 - Celery Beat (Periodic Tasks):**
+```bash
+python3 -m celery -A app.core.celery_app beat --loglevel=info
+```
+
+### 5️⃣ Access the Application
+
+- 🌐 **Web Dashboard**: http://localhost:8000/
+- 📚 **API Documentation**: http://localhost:8000/docs
+- 🔍 **ReDoc**: http://localhost:8000/redoc
+- ❤️ **Health Check**: http://localhost:8000/health
 
 ---
 
-## 🌐 Demo Endpoints
+## 🔌 Setting Up GitHub Webhooks
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /` | Health check |
-| `GET /api/dashboard/stats` | System statistics |
-| `GET /api/claims` | List all claims |
-| `POST /api/repositories` | Register repository |
-| `GET /docs` | Interactive API documentation |
+To receive real-time claim detection, configure webhooks for your repositories:
 
-### 🧪 Test Pattern Matching
+### Option 1: Using ngrok (Development)
 
-The system includes a sophisticated pattern matching engine:
+```bash
+# Install ngrok: https://ngrok.com/download
+ngrok http 8000
 
-```python
-# Direct Claims (95% confidence)
-"I'll take this!" → ✅ CLAIM [95%]
-"I can work on this" → ✅ CLAIM [95%]
+# Copy the https URL (e.g., https://abc123.ngrok-free.app)
+```
 
-# Assignment Requests (90% confidence)  
-"Please assign to me" → ✅ CLAIM [90%]
-"I want to work on this" → ✅ CLAIM [90%]
+### Option 2: Production Server
 
-# Questions (70% confidence)
-"Can I work on this?" → ✅ CLAIM [70%]
-"Is this available?" → ✅ CLAIM [70%]
+Use your production domain (e.g., `https://yourdomain.com`)
 
-# Non-claims (below 75% threshold)
-"This looks interesting" → ❌ NO CLAIM [0%]
+### Configure Webhook on GitHub
+
+1. Go to your repository → **Settings** → **Webhooks** → **Add webhook**
+2. **Payload URL**: `https://your-url.com/api/v1/webhooks/github`
+3. **Content type**: `application/json`
+4. **Events**: Select "Issue comments"
+5. **Active**: ✅ Check this box
+6. Click **Add webhook**
+
+### Register Repository in Dashboard
+
+1. Login to http://localhost:8000/
+2. Go to **Repositories** tab
+3. Click **Add Repository**
+4. Enter: `owner/repo` (e.g., `auankj/my-project`)
+5. Configure grace period and nudge settings
+6. Click **Register**
+
+🎉 **You're all set!** The system will now detect claims automatically.
+
+---
+
+## � How It Works
+
+### 1. **Claim Detection**
+
+When someone comments on an issue:
+```
+"I'll work on this!" → 95% confidence CLAIM detected
+"Can I take this?" → 70% confidence CLAIM detected  
+"This looks interesting" → 0% (not a claim)
+```
+
+The system analyzes the comment using pattern matching and creates a claim record.
+
+### 2. **Progress Tracking**
+
+The system monitors:
+- ✅ Linked pull requests
+- ✅ Commit activity
+- ✅ Issue comments from the claimant
+
+Any activity resets the grace period timer.
+
+### 3. **Nudge System**
+
+After the grace period (default: 7 days):
+1. **First nudge**: Polite reminder via GitHub comment and email
+2. **Wait period**: Another grace period
+3. **Second nudge**: Final reminder
+4. **Auto-release**: If still no activity, claim is released
+
+### 4. **Analytics**
+
+Track contributor behavior:
+- Active claims per repository
+- Average claim duration
+- Completion rates
+- Repeat "cookie lickers"
+
+---
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+cookie-licking-detector/
+├── app/
+│   ├── api/              # API routes
+│   │   ├── auth_routes.py
+│   │   ├── repository_routes.py
+│   │   ├── claim_routes.py
+│   │   └── webhook_routes.py
+│   ├── core/             # Core configuration
+│   │   ├── config.py
+│   │   ├── celery_app.py
+│   │   └── security.py
+│   ├── db/               # Database
+│   │   ├── models/       # SQLAlchemy models
+│   │   └── session.py
+│   ├── services/         # Business logic
+│   │   ├── github_service.py
+│   │   ├── claim_detector.py
+│   │   └── notification_service.py
+│   ├── tasks/            # Celery tasks
+│   │   ├── comment_analysis.py
+│   │   ├── nudge_tasks.py
+│   │   └── progress_tracking.py
+│   └── main.py           # FastAPI application
+├── alembic/              # Database migrations
+├── static/               # Frontend assets
+│   └── webapp/           # Web dashboard
+├── tests/                # Test suite
+├── .env                  # Environment variables
+├── requirements.txt      # Python dependencies
+└── README.md
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=app --cov-report=html
+
+# Run specific test file
+pytest tests/unit/test_claim_detector.py
+```
+
+### Code Style
+
+This project uses:
+- **Black** for code formatting
+- **isort** for import sorting
+- **flake8** for linting
+- **mypy** for type checking
+
+```bash
+# Format code
+black app/ tests/
+
+# Sort imports
+isort app/ tests/
+
+# Lint
+flake8 app/ tests/
+
+# Type check
+mypy app/
+```
+
+### Database Migrations
+
+```bash
+# Create a new migration
+alembic revision --autogenerate -m "Description of changes"
+
+# Apply migrations
+alembic upgrade head
+
+# Rollback one version
+alembic downgrade -1
 ```
 
 ---
 
-## 📊 Demo Scenarios
+## 🤝 Contributing
 
-The demo creates three realistic scenarios:
+We welcome contributions! Here's how to get started:
 
-1. **Fresh Claim**: `eager-contributor` just claimed issue #101
-2. **Stale Claim**: `slow-worker` claimed issue #102, 4 days ago (ready for nudge)
-3. **Ghost Claim**: `ghost-claimer` claimed issue #103, 10 days ago (ready for auto-release)
+### 1. Fork the Repository
 
----
+Click the **Fork** button at the top of this page.
 
-## 🛠️ Technical Implementation
+### 2. Clone Your Fork
 
-### Database Schema (from MD specs)
-- **repositories**: Monitoring configuration
-- **issues**: GitHub issue data
-- **claims**: Claim records with confidence scores
-- **activity_log**: System activity tracking
-- **progress_tracking**: PR and commit monitoring
-- **queue_jobs**: Background job management
-
-### Pattern Matching Engine
-```python
-# Exact confidence scores from MD file
-DIRECT_CLAIM = 95%      # "I'll take this"
-ASSIGNMENT_REQUEST = 90% # "Please assign to me"  
-QUESTION = 70%          # "Can I work on this?"
-PROGRESS_UPDATE = 0%    # For timer reset only
-
-# Context analysis
-+10% for maintainer replies
-+5% for already assigned users
-Threshold: 75% (configurable)
+```bash
+git clone https://github.com/YOUR_USERNAME/cookie-licking-detector.git
+cd cookie-licking-detector
 ```
 
-### Queue System
-- **comment_analysis**: Process new comments for claims
-- **nudge_check**: Send notifications to inactive users
-- **progress_check**: Monitor PRs and commits
-- **auto_release_check**: Release stale claims
-- **dead_letter**: Failed jobs for manual review
+### 3. Create a Branch
 
-### API Design (exact MD specs)
-- Repository Management: CRUD operations
-- Claim Management: List, details, manual actions
-- Dashboard: Stats, metrics, user insights
-- Progress Tracking: PR/commit monitoring
+```bash
+git checkout -b feature/your-feature-name
+```
 
----
+### 4. Make Your Changes
 
-## 🎯 Hackathon Success Criteria
+- Write clean, documented code
+- Add tests for new features
+- Update documentation as needed
+- Follow the existing code style
 
-✅ **Complete MVP**: All core features implemented  
-✅ **Pattern Matching**: Multi-level detection with exact confidence scores  
-✅ **Distributed System**: Redis locking, atomic transactions  
-✅ **Real Integration**: Ecosyste.ms API, GitHub API, SendGrid  
-✅ **Comprehensive Testing**: Demo scenarios and test data  
-✅ **Production Ready**: Error handling, logging, monitoring  
-✅ **Documentation**: Complete API docs and architecture  
+### 5. Test Your Changes
 
----
+```bash
+# Run tests
+pytest
 
-## 🔮 Future Enhancements
+# Check code style
+black app/ --check
+flake8 app/
+```
 
-- **Machine Learning**: Train models on pattern matching data
-- **GitHub App**: Real-time webhook integration
-- **Advanced Analytics**: Predictive completion likelihood
-- **Slack Integration**: Team notifications
-- **Mobile Dashboard**: React Native app
+### 6. Commit and Push
 
----
+```bash
+git add .
+git commit -m "feat: Add your feature description"
+git push origin feature/your-feature-name
+```
 
-## 📚 Architecture Deep Dive
+### 7. Open a Pull Request
 
-This implementation follows the exact specifications from the comprehensive project documentation:
+Go to your fork on GitHub and click **New Pull Request**.
 
-- **Event Ingestion**: Webhooks and API polling
-- **Processing Pipeline**: Multi-queue job routing
-- **Comment Analysis**: Pattern matching with confidence scoring
-- **Distributed Locking**: Redis-based concurrency control
-- **Progress Monitoring**: PR/commit activity tracking
-- **Notification System**: Email and GitHub comments
-- **Auto-Release**: Configurable grace periods
-- **Analytics**: Repository and user metrics
+### Contribution Guidelines
+
+- **Bug Reports**: Open an issue with detailed steps to reproduce
+- **Feature Requests**: Describe the use case and expected behavior
+- **Code Contributions**: Follow the style guide and add tests
+- **Documentation**: Improvements to docs are always welcome!
 
 ---
 
-## 🏆 Demonstration Ready
+## 📊 API Reference
 
-The system is fully functional and ready for live demonstration:
+### Authentication
 
-1. **Pattern Detection**: Real-time comment analysis
-2. **Claim Management**: Full lifecycle tracking
-3. **Dashboard Insights**: Live metrics and analytics
-4. **API Integration**: Working Ecosyste.ms connection
-5. **Background Jobs**: Celery queue processing
-6. **Data Persistence**: PostgreSQL with sample data
+```bash
+# Login
+POST /api/v1/auth/login
+{
+  "email": "user@example.com",
+  "password": "password"
+}
 
-**This is a complete, production-ready implementation of the Cookie-Licking Detector system as specified in the project documentation.**
+# Response: JWT token
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+  "token_type": "bearer"
+}
+```
+
+### Repositories
+
+```bash
+# List repositories
+GET /api/v1/repositories
+Authorization: Bearer <token>
+
+# Register repository
+POST /api/v1/repositories
+{
+  "owner": "auankj",
+  "name": "my-project",
+  "grace_period_days": 7,
+  "max_nudges": 2
+}
+```
+
+### Claims
+
+```bash
+# List all claims
+GET /api/v1/claims?status=ACTIVE
+
+# Get claim details
+GET /api/v1/claims/{claim_id}
+
+# Manually release claim
+POST /api/v1/claims/{claim_id}/release
+```
+
+### Webhooks
+
+```bash
+# GitHub webhook endpoint
+POST /api/v1/webhooks/github
+```
+
+For complete API documentation, visit http://localhost:8000/docs
+
+---
+
+## 🔒 Security
+
+### Reporting Security Issues
+
+**Please do not open public issues for security vulnerabilities.**
+
+Email security concerns to: [your-email@example.com]
+
+### Security Features
+
+- ✅ JWT authentication with secure token handling
+- ✅ Password hashing with bcrypt
+- ✅ SQL injection prevention via SQLAlchemy ORM
+- ✅ CORS configuration
+- ✅ Rate limiting on API endpoints
+- ✅ Environment variable protection (.env not committed)
+- ✅ Webhook signature verification
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## � Acknowledgments
+
+- Inspired by the need to keep open source projects healthy and contributor-friendly
+- Built with [FastAPI](https://fastapi.tiangolo.com/), [SQLAlchemy](https://www.sqlalchemy.org/), and [Celery](https://docs.celeryq.dev/)
+- Pattern detection inspired by common GitHub contribution patterns
+
+---
+
+## 📞 Support
+
+- **Documentation**: Check the [docs](./docs) folder
+- **Issues**: [GitHub Issues](https://github.com/auankj/cookie-licking-detector/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/auankj/cookie-licking-detector/discussions)
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Machine learning-based pattern detection
+- [ ] Slack/Discord integration for notifications
+- [ ] Multi-language support
+- [ ] Mobile app for claim management
+- [ ] Browser extension for maintainers
+- [ ] Advanced analytics and reporting
+- [ ] GitLab and Bitbucket support
+
+---
+
+**Made with ❤️ for the open source community**
