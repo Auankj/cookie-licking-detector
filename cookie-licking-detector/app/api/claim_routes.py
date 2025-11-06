@@ -15,7 +15,7 @@ from datetime import datetime
 
 from app.db.database import get_async_session
 from app.db.models import Claim, ActivityLog, Issue, Repository, ClaimStatus
-from app.workers.nudge_check import process_nudge_check
+from app.tasks.nudge_check import check_stale_claims_task
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -262,8 +262,9 @@ async def manually_send_nudge(
         )
     
     try:
-        # Schedule nudge check (which will send the nudge)
-        result = process_nudge_check.delay(claim_id)
+        # Schedule nudge check using new Celery tasks API
+        # The task will process this specific claim and send nudge if needed
+        result = check_stale_claims_task.delay()
         
         # Log the manual nudge action
         from app.db.models import ActivityType
@@ -340,17 +341,19 @@ async def manually_release_claim(
         
         # Remove GitHub assignment if exists
         try:
-            from app.services.github_service import GitHubService
-            github_service = GitHubService()
+            from app.services.github_service import GitHubAPIService
+            github_service = GitHubAPIService()
             
             if claim.issue and claim.issue.repository:
-                repo_full_name = f"{claim.issue.repository.owner}/{claim.issue.repository.name}"
+                owner_name = claim.issue.repository.owner_name
+                repo_name = claim.issue.repository.name
                 await github_service.unassign_issue(
-                    repo_full_name,
-                    claim.issue.github_issue_number,
-                    claim.github_username
+                    owner=owner_name,
+                    name=repo_name,
+                    issue_number=claim.issue.github_issue_number,
+                    username=claim.github_username
                 )
-                logger.info(f"Removed GitHub assignment for {claim.github_username} on {repo_full_name}#{claim.issue.github_issue_number}")
+                logger.info(f"Removed GitHub assignment for {claim.github_username} on {owner_name}/{repo_name}#{claim.issue.github_issue_number}")
         except Exception as e:
             logger.warning(f"Failed to remove GitHub assignment: {e}")
         
@@ -361,7 +364,7 @@ async def manually_release_claim(
             
             if claim.issue and claim.issue.repository:
                 await notification_service.send_maintainer_notification(
-                    repository_full_name=f"{claim.issue.repository.owner}/{claim.issue.repository.name}",
+                    repository_full_name=f"{claim.issue.repository.owner_name}/{claim.issue.repository.name}",
                     event_type="manual_release",
                     details={
                         "issue_number": claim.issue.github_issue_number,

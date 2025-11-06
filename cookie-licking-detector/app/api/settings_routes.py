@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from app.db.database import get_async_session
-from app.db.models import Repository, User
+from app.db.models import Repository, User, SystemSettings
 from app.core.security import get_current_user, require_admin
 
 router = APIRouter()
@@ -46,42 +46,106 @@ class SystemStats(BaseModel):
     database_size: str
     cache_hit_rate: float
 
-# Global settings store (in production, this should be in database table: system_settings)
-# TODO: Migrate to database-backed storage for production scale-out
-_system_settings = SystemSettingsModel()
+
+async def get_or_create_settings(db: AsyncSession) -> SystemSettings:
+    """
+    Get settings from database or create default settings if none exist.
+    Ensures single row table for application configuration.
+    """
+    stmt = select(SystemSettings).limit(1)
+    result = await db.execute(stmt)
+    settings = result.scalar_one_or_none()
+    
+    if not settings:
+        # Create default settings on first access
+        settings = SystemSettings(
+            id=1,
+            claim_timeout_hours=24,
+            max_claims_per_user=3,
+            auto_release_enabled=True,
+            webhook_secret=None,
+            notification_settings={
+                "email_enabled": False,
+                "slack_enabled": False,
+                "discord_enabled": False
+            },
+            rate_limiting={
+                "enabled": True,
+                "requests_per_minute": 60
+            },
+            github_integration={
+                "app_id": None,
+                "installation_id": None,
+                "webhook_url": None
+            }
+        )
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    
+    return settings
+
 
 @router.get("/settings", response_model=SystemSettingsModel)
-async def get_settings(current_user: User = Depends(require_admin)):
+async def get_settings(
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_async_session)
+):
     """
-    Get current system settings (admin only)
+    Get current system settings from database (admin only)
     """
-    return _system_settings
+    settings = await get_or_create_settings(db)
+    
+    # Convert database model to response model
+    return SystemSettingsModel(
+        claim_timeout_hours=settings.claim_timeout_hours,
+        max_claims_per_user=settings.max_claims_per_user,
+        auto_release_enabled=settings.auto_release_enabled,
+        webhook_secret=settings.webhook_secret,
+        notification_settings=NotificationSettings(**settings.notification_settings) if settings.notification_settings else NotificationSettings(),
+        rate_limiting=RateLimitingSettings(**settings.rate_limiting) if settings.rate_limiting else RateLimitingSettings(),
+        github_integration=GitHubIntegrationSettings(**settings.github_integration) if settings.github_integration else GitHubIntegrationSettings()
+    )
+
 
 @router.put("/settings", response_model=SystemSettingsModel)
 async def update_settings(
-    settings: SystemSettingsModel,
-    current_user: User = Depends(require_admin)
+    settings_update: SystemSettingsModel,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Update system settings (admin only)
+    Update system settings in database (admin only)
     """
-    global _system_settings
-    
     # Basic validation
-    if settings.claim_timeout_hours < 1 or settings.claim_timeout_hours > 168:
+    if settings_update.claim_timeout_hours < 1 or settings_update.claim_timeout_hours > 168:
         raise HTTPException(
             status_code=400,
             detail="claim_timeout_hours must be between 1 and 168 hours"
         )
     
-    if settings.max_claims_per_user < 1 or settings.max_claims_per_user > 10:
+    if settings_update.max_claims_per_user < 1 or settings_update.max_claims_per_user > 10:
         raise HTTPException(
             status_code=400,
             detail="max_claims_per_user must be between 1 and 10"
         )
     
-    _system_settings = settings
-    return _system_settings
+    # Get existing settings or create new
+    settings = await get_or_create_settings(db)
+    
+    # Update settings in database
+    settings.claim_timeout_hours = settings_update.claim_timeout_hours
+    settings.max_claims_per_user = settings_update.max_claims_per_user
+    settings.auto_release_enabled = settings_update.auto_release_enabled
+    settings.webhook_secret = settings_update.webhook_secret
+    settings.notification_settings = settings_update.notification_settings.dict()
+    settings.rate_limiting = settings_update.rate_limiting.dict()
+    settings.github_integration = settings_update.github_integration.dict()
+    
+    await db.commit()
+    await db.refresh(settings)
+    
+    return settings_update
 
 @router.get("/system/stats", response_model=SystemStats)
 async def get_system_stats(

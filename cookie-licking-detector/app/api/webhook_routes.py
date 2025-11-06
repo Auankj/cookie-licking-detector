@@ -88,21 +88,27 @@ async def handle_github_webhook(
         
         logger.info(f"Received GitHub webhook: {github_event} - {github_delivery}")
         
-        # Handle different event types
+        # Handle different event types and capture return values
+        result = None
         if github_event == "issue_comment":
-            await handle_issue_comment(payload, background_tasks, db)
+            result = await handle_issue_comment(payload, background_tasks, db)
         elif github_event == "issues":
-            await handle_issues(payload, background_tasks, db)
+            result = await handle_issues(payload, background_tasks, db)
         elif github_event == "pull_request":
-            await handle_pull_request(payload, background_tasks, db)
+            result = await handle_pull_request(payload, background_tasks, db)
         elif github_event == "push":
-            await handle_push(payload, background_tasks, db)
+            result = await handle_push(payload, background_tasks, db)
         elif github_event == "ping":
             # Webhook test event
             track_api_call("webhook", "github_ping", 200)
             return {"message": "pong"}
         else:
             logger.info(f"Unhandled GitHub event: {github_event}")
+        
+        # Check if handler returned an ignored status
+        if isinstance(result, dict) and result.get("status") == "ignored":
+            track_api_call("webhook", "github_ignored", 202)
+            return result
         
         track_api_call("webhook", "github", 200)
         return {"message": "Webhook processed successfully"}
@@ -397,11 +403,17 @@ async def handle_pull_request(
                         result = await db.execute(stmt)
                         active_claims = result.scalars().all()
                         
-                        # Queue progress check for each active claim (correct signature: claim_id only)
+                        # Queue progress check for each active claim with error handling
+                        queued_count = 0
                         for claim in active_claims:
-                            update_progress_task.delay(claim.id)
-                            
-                        logger.info(f"Queued progress checks for {len(active_claims)} claims on issue #{issue_number}")
+                            try:
+                                task_result = update_progress_task.delay(claim.id)
+                                logger.info(f"Queued progress check for claim {claim.id}, task_id: {task_result.id}")
+                                queued_count += 1
+                            except Exception as e:
+                                logger.error(f"Failed to queue progress check for claim {claim.id}: {e}")
+                        
+                        logger.info(f"Queued {queued_count}/{len(active_claims)} progress checks for issue #{issue_number} (PR event)")
             except Exception as e:
                 logger.error(f"Error processing PR references: {e}")
             
@@ -454,11 +466,17 @@ async def handle_push(
                     result = await db.execute(stmt)
                     active_claims = result.scalars().all()
                     
-                    # Queue progress check for each active claim (correct signature)
+                    # Queue progress check for each active claim with error handling
+                    queued_count = 0
                     for claim in active_claims:
-                        check_progress_task.delay(claim.id)
+                        try:
+                            task_result = check_progress_task.delay(claim.id)
+                            logger.info(f"Queued progress check for claim {claim.id}, task_id: {task_result.id}")
+                            queued_count += 1
+                        except Exception as e:
+                            logger.error(f"Failed to queue progress check for claim {claim.id}: {e}")
                     
-                    logger.info(f"Queued {len(active_claims)} progress checks for issue #{issue_number} (push event)")
+                    logger.info(f"Queued {queued_count}/{len(active_claims)} progress checks for issue #{issue_number} (push event)")
         except Exception as e:
             logger.error(f"Error processing push event issue references: {e}")
         

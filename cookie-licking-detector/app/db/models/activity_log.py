@@ -14,6 +14,7 @@ class ActivityType(enum.Enum):
     AUTO_RELEASE = "AUTO_RELEASE"
     COMMENT = "COMMENT"
     PROGRESS_UPDATE = "PROGRESS_UPDATE"
+    MANUAL_RELEASE = "MANUAL_RELEASE"
 
 class ActivityLog(Base):
     """

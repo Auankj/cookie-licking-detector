@@ -27,6 +27,7 @@ from .progress_tracking import ProgressTracking, PRStatus, DetectionSource
 
 # 6. Import standalone models
 from .queue_jobs import QueueJob, JobType, JobStatus
+from .system_settings import SystemSettings
 
 # Export all models and enums
 __all__ = [
@@ -44,5 +45,7 @@ __all__ = [
     # Progress tracking models
     "ProgressTracking", "PRStatus", "DetectionSource",
     # Queue models
-    "QueueJob", "JobType", "JobStatus"
+    "QueueJob", "JobType", "JobStatus",
+    # System settings
+    "SystemSettings"
 ]
