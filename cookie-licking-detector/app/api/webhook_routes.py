@@ -62,12 +62,19 @@ async def handle_github_webhook(
         payload_body = await request.body()
         
         # Verify signature if webhook secret is configured
-        if settings.GITHUB_WEBHOOK_SECRET and not verify_github_signature(payload_body, signature_header):
-            track_api_call("webhook", "github", 401)
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid signature"
-            )
+        if settings.GITHUB_WEBHOOK_SECRET:
+            if not signature_header:
+                track_api_call("webhook", "github", 401)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Missing X-Hub-Signature-256 header"
+                )
+            if not verify_github_signature(payload_body, signature_header):
+                track_api_call("webhook", "github", 401)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid signature"
+                )
         
         # Parse JSON payload
         try:
@@ -162,8 +169,13 @@ async def handle_issue_comment(
             logger.info(f"✅ Auto-added repository: {repo_record.full_name} (ID: {repo_record.id})")
         
         elif not repo_record.is_monitored:
-            logger.info(f"Repository {repository.get('full_name')} not monitored, skipping")
-            return
+            logger.info(f"Repository {repository.get('full_name')} not monitored, ignoring webhook")
+            track_api_call("webhook", "github_ignored", 202)
+            return {
+                "message": "Repository not monitored",
+                "repository": repository.get('full_name'),
+                "status": "ignored"
+            }
         
         # Get repository configuration
         repository_config = {
@@ -257,9 +269,12 @@ async def handle_issue_comment(
         'issue_data': issue_data
     }
     
-    analyze_comment_task.delay(task_data)
-    
-    logger.info(f"Queued complete comment analysis for issue #{issue.get('number')} in {repository.get('full_name')}")
+    try:
+        task_result = analyze_comment_task.delay(task_data)
+        logger.info(f"Queued comment analysis task {task_result.id} for issue #{issue.get('number')} in {repository.get('full_name')}")
+    except Exception as e:
+        logger.error(f"Failed to queue comment analysis task: {e}")
+        # Don't fail the webhook - just log the error
 
 
 async def handle_issues(
@@ -286,9 +301,37 @@ async def handle_issues(
             "action": action
         }
         
-        # If issue was assigned/unassigned, check for progress updates
+        # If issue was assigned/unassigned, trigger progress check for all active claims
+        # Note: check_progress_task signature is (claim_id: int), so we need to find claims first
         if action in ["assigned", "unassigned"]:
-            check_progress_task.delay(issue_data)
+            try:
+                # Find all active claims for this issue
+                stmt = select(Issue).where(
+                    Issue.github_repo_id == issue_data["repository_id"],
+                    Issue.github_issue_number == issue_data["issue_number"]
+                )
+                result = await db.execute(stmt)
+                issue_record = result.scalar_one_or_none()
+                
+                if issue_record:
+                    stmt = select(Claim).where(
+                        Claim.issue_id == issue_record.id,
+                        Claim.status == ClaimStatus.ACTIVE
+                    )
+                    result = await db.execute(stmt)
+                    active_claims = result.scalars().all()
+                    
+                    # Queue progress check for each active claim (correct signature)
+                    for claim in active_claims:
+                        try:
+                            task_result = check_progress_task.delay(claim.id)
+                            logger.info(f"Queued progress check task {task_result.id} for claim {claim.id}")
+                        except Exception as e:
+                            logger.error(f"Failed to queue progress check for claim {claim.id}: {e}")
+                    
+                    logger.info(f"Queued {len(active_claims)} progress checks for issue #{issue_data['issue_number']}")
+            except Exception as e:
+                logger.error(f"Error queueing progress checks: {e}")
         
         logger.info(f"Processed issue {action} for #{issue_data['issue_number']} in {issue_data['repository_full_name']}")
 
@@ -354,13 +397,9 @@ async def handle_pull_request(
                         result = await db.execute(stmt)
                         active_claims = result.scalars().all()
                         
-                        # Queue progress check for each active claim
+                        # Queue progress check for each active claim (correct signature: claim_id only)
                         for claim in active_claims:
-                            # Update PR data for progress tracking
-                            update_progress_task.delay(
-                                claim_id=claim.id,
-                                pr_data=pr_data
-                            )
+                            update_progress_task.delay(claim.id)
                             
                         logger.info(f"Queued progress checks for {len(active_claims)} claims on issue #{issue_number}")
             except Exception as e:
@@ -392,22 +431,38 @@ async def handle_push(
         issue_references.extend(refs)
     
     if issue_references:
-        push_data = {
-            "repository_id": repository.get("id"),
-            "repository_full_name": repository.get("full_name"),
-            "pusher": pusher.get("name"),
-            "commit_count": len(commits),
-            "referenced_issues": list(set(issue_references)),  # Remove duplicates
-            "ref": payload.get("ref")
-        }
+        # Push event detected issue references - find claims and queue progress checks
+        # Note: check_progress_task expects claim_id, not push_data
+        try:
+            for issue_number_str in set(issue_references):
+                issue_number = int(issue_number_str)
+                
+                # Find issue in database
+                stmt = select(Issue).where(
+                    Issue.github_repo_id == repository.get("id"),
+                    Issue.github_issue_number == issue_number
+                )
+                result = await db.execute(stmt)
+                issue_record = result.scalar_one_or_none()
+                
+                if issue_record:
+                    # Find active claims for this issue
+                    stmt = select(Claim).where(
+                        Claim.issue_id == issue_record.id,
+                        Claim.status == ClaimStatus.ACTIVE
+                    )
+                    result = await db.execute(stmt)
+                    active_claims = result.scalars().all()
+                    
+                    # Queue progress check for each active claim (correct signature)
+                    for claim in active_claims:
+                        check_progress_task.delay(claim.id)
+                    
+                    logger.info(f"Queued {len(active_claims)} progress checks for issue #{issue_number} (push event)")
+        except Exception as e:
+            logger.error(f"Error processing push event issue references: {e}")
         
-        # Queue progress check for referenced issues
-        background_tasks.add_task(
-            check_progress_task.delay,
-            push_data
-        )
-        
-        logger.info(f"Push to {push_data['repository_full_name']} references issues: {issue_references}")
+        logger.info(f"Push to {repository.get('full_name')} references issues: {issue_references}")
 
 
 @router.post("/test")
@@ -422,7 +477,14 @@ async def test_webhook(
             detail="Not found"
         )
     
-    payload = await request.json()
+    try:
+        payload = await request.json()
+    except Exception:
+        # Handle case where no JSON body was sent
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Request body must be valid JSON"
+        )
     
     logger.info("Test webhook received")
     logger.debug(f"Test payload: {payload}")

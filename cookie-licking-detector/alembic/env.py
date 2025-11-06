@@ -30,7 +30,11 @@ target_metadata = Base.metadata
 def get_database_url():
     """Get database URL from environment or config"""
     settings = get_settings()
-    return settings.DATABASE_URL
+    # Convert asyncpg to psycopg2 for synchronous Alembic migrations
+    db_url = settings.DATABASE_URL
+    if '+asyncpg' in db_url:
+        db_url = db_url.replace('+asyncpg', '')
+    return db_url
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.

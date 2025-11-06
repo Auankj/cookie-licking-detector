@@ -12,37 +12,38 @@ from typing import List, Dict
 from datetime import datetime, timedelta
 
 from app.db.database import get_async_session
-from app.db.models import Repository, Claim, Issue, ActivityLog
+from app.db.models import Repository, Claim, Issue, ActivityLog, User
 from app.db.models.claims import ClaimStatus
+from app.core.security import get_current_user
 
 router = APIRouter()
 
 @router.get("/dashboard/stats")
-async def get_dashboard_stats(db: AsyncSession = Depends(get_async_session)):
+async def get_dashboard_stats(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user)
+):
     """
     Overall system statistics
     As specified in MD file: GET /api/dashboard/stats
     """
     
-    # Total claims
-    total_claims_stmt = select(func.count(Claim.id))
-    total_claims_result = await db.execute(total_claims_stmt)
-    total_claims = total_claims_result.scalar()
+    # Aggregate all claim counts in a single query using conditional aggregation
+    stats_stmt = select(
+        func.count(Claim.id).label("total_claims"),
+        func.sum(case((Claim.status == ClaimStatus.ACTIVE, 1), else_=0)).label("active_claims"),
+        func.sum(case((Claim.status == ClaimStatus.RELEASED, 1), else_=0)).label("released_claims"),
+        func.sum(case((Claim.status == ClaimStatus.COMPLETED, 1), else_=0)).label("completed_claims"),
+        func.sum(case((Claim.release_reason == "auto_released_after_max_nudges", 1), else_=0)).label("auto_released")
+    )
+    stats_result = await db.execute(stats_stmt)
+    stats = stats_result.first()
     
-    # Active claims  
-    active_claims_stmt = select(func.count(Claim.id)).where(Claim.status == ClaimStatus.ACTIVE)
-    active_claims_result = await db.execute(active_claims_stmt)
-    active_claims = active_claims_result.scalar()
-    
-    # Released claims
-    released_claims_stmt = select(func.count(Claim.id)).where(Claim.status == ClaimStatus.RELEASED)
-    released_claims_result = await db.execute(released_claims_stmt)
-    released_claims = released_claims_result.scalar()
-    
-    # Completed claims
-    completed_claims_stmt = select(func.count(Claim.id)).where(Claim.status == ClaimStatus.COMPLETED)
-    completed_claims_result = await db.execute(completed_claims_stmt)
-    completed_claims = completed_claims_result.scalar()
+    total_claims = stats.total_claims or 0
+    active_claims = stats.active_claims or 0
+    released_claims = stats.released_claims or 0
+    completed_claims = stats.completed_claims or 0
+    auto_released = stats.auto_released or 0
     
     # Claims by confidence score distribution  
     confidence_bucket = func.floor(Claim.confidence_score / 10) * 10
@@ -60,14 +61,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_async_session)):
         Claim.claim_timestamp >= week_ago
     )
     recent_claims_result = await db.execute(recent_claims_stmt)
-    recent_claims = recent_claims_result.scalar()
-    
-    # Auto-release rate
-    auto_released_stmt = select(func.count(Claim.id)).where(
-        Claim.release_reason == "auto_released_after_max_nudges"
-    )
-    auto_released_result = await db.execute(auto_released_stmt)
-    auto_released = auto_released_result.scalar()
+    recent_claims = recent_claims_result.scalar() or 0
     
     # Average time to release
     released_with_time_stmt = select(Claim).where(
@@ -94,7 +88,7 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_async_session)):
         },
         "metrics": {
             "recent_claims_7d": recent_claims,
-            "auto_release_rate": auto_released / max(total_claims, 1) * 100,
+            "auto_release_rate": (auto_released / max(total_claims, 1)) * 100,
             "avg_time_to_release_days": round(avg_time_to_release or 0, 1)
         },
         "confidence_distribution": confidence_distribution,
@@ -102,7 +96,10 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_async_session)):
     }
 
 @router.get("/dashboard/repositories")
-async def get_repository_metrics(db: AsyncSession = Depends(get_async_session)):
+async def get_repository_metrics(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user)
+):
     """
     Repository-specific metrics
     As specified in MD file: GET /api/dashboard/repositories
@@ -176,7 +173,10 @@ async def get_repository_metrics(db: AsyncSession = Depends(get_async_session)):
     }
 
 @router.get("/dashboard/users")
-async def get_user_metrics(db: AsyncSession = Depends(get_async_session)):
+async def get_user_metrics(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user)
+):
     """
     User activity metrics
     As specified in MD file: GET /api/dashboard/users
@@ -235,7 +235,10 @@ async def get_user_metrics(db: AsyncSession = Depends(get_async_session)):
     }
 
 @router.get("/dashboard/activity")
-async def get_recent_activity(db: AsyncSession = Depends(get_async_session)):
+async def get_recent_activity(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(get_current_user)
+):
     """
     Recent system activity feed
     """

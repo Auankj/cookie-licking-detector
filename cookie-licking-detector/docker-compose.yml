@@ -9,7 +9,10 @@ services:
     environment:
       - DATABASE_URL=postgresql://cookie_user:cookie_password@db:5432/cookie_detector
       - REDIS_URL=redis://redis:6379/0
-      - ENVIRONMENT=production
+      - ENVIRONMENT=development  # Changed from production - requires GITHUB_TOKEN and SENDGRID_API_KEY for production
+      # For production, set ENVIRONMENT=production and add:
+      # - GITHUB_TOKEN=${GITHUB_TOKEN}
+      # - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     depends_on:
       - db
       - redis
@@ -29,7 +32,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://cookie_user:cookie_password@db:5432/cookie_detector
       - REDIS_URL=redis://redis:6379/0
-      - ENVIRONMENT=production
+      - ENVIRONMENT=development  # Changed from production
     depends_on:
       - db
       - redis
@@ -44,7 +47,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://cookie_user:cookie_password@db:5432/cookie_detector
       - REDIS_URL=redis://redis:6379/0
-      - ENVIRONMENT=production
+      - ENVIRONMENT=development  # Changed from production
     depends_on:
       - db
       - redis

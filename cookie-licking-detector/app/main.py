@@ -20,8 +20,9 @@ from app.core.monitoring import (
     health_checker, track_request_metrics, get_metrics, 
     CONTENT_TYPE_LATEST
 )
-from app.core.security import add_security_headers
+from app.core.security import add_security_headers, get_current_user
 from app.db.database import get_async_session, create_tables, close_db
+from app.db.models.user import User
 
 # Import all route modules
 from app.api.auth_routes import router as auth_router
@@ -143,10 +144,20 @@ app = FastAPI(
 
 # Security middleware
 if settings.ENVIRONMENT == "production":
+    # Strip any schemes/ports from allowed hosts to ensure only hostnames
+    cleaned_hosts = []
+    for host in settings.ALLOWED_HOSTS:
+        # Remove http://, https://, and port numbers
+        cleaned = host.replace('http://', '').replace('https://', '')
+        if ':' in cleaned:
+            cleaned = cleaned.split(':')[0]
+        cleaned_hosts.append(cleaned)
+    
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=settings.CORS_ORIGINS
+        allowed_hosts=cleaned_hosts  # Use cleaned hostnames only
     )
+    logger.info(f"TrustedHostMiddleware enabled with hosts: {cleaned_hosts}")
 
 # CORS middleware
 app.add_middleware(
@@ -160,9 +171,9 @@ app.add_middleware(
 
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
-    """Add security headers to all responses."""
+    """Add security headers to all responses with route-specific CSP."""
     response = await call_next(request)
-    return add_security_headers(response)
+    return add_security_headers(response, request_path=request.url.path)
 
 
 @app.middleware("http")
@@ -217,6 +228,49 @@ async def apple_touch_icon():
         content=b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\xb4\x00\x00\x00\xb4\x08\x06\x00\x00\x00\xe8\x05\x08\x8c\x00\x00\x00\x19tEXtSoftware\x00Adobe ImageReadyq\xc9e<\x00\x00\x00\x0bIDATx\x9cc```\x00\x00\x00\x05\x00\x01\r\n0a\x2d\xb4\x00\x00\x00\x00IEND\xaeB`\x82',
         media_type="image/png"
     )
+
+
+# Web Application routes
+@app.get("/", include_in_schema=False)
+async def serve_webapp():
+    """Serve the main web application."""
+    webapp_path = os.path.join(os.path.dirname(__file__), "..", "static", "webapp", "index.html")
+    if os.path.exists(webapp_path):
+        return FileResponse(webapp_path, media_type="text/html")
+    else:
+        # Fallback to API info if webapp not found
+        return JSONResponse(content={
+            "message": "Cookie-Licking Detector API",
+            "version": "1.0.0",
+            "docs": "/docs",
+            "redoc": "/redoc",
+            "webapp": "Web app not found"
+        })
+
+
+@app.get("/static/webapp/styles.css", include_in_schema=False)
+async def serve_webapp_css():
+    """Serve webapp CSS."""
+    css_path = os.path.join(os.path.dirname(__file__), "..", "static", "webapp", "styles.css")
+    if os.path.exists(css_path):
+        return FileResponse(css_path, media_type="text/css")
+    else:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="CSS not found")
+
+
+@app.get("/static/webapp/app.js", include_in_schema=False)
+async def serve_webapp_js():
+    """Serve webapp JavaScript."""
+    js_path = os.path.join(os.path.dirname(__file__), "..", "static", "webapp", "app.js")
+    if os.path.exists(js_path):
+        return FileResponse(js_path, media_type="application/javascript")
+    else:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="JavaScript not found")
+
+
+@app.get("/redoc.standalone.js", include_in_schema=False)
 
 
 @app.get("/redoc.standalone.js", include_in_schema=False)
@@ -411,7 +465,7 @@ async def custom_redoc_html():
 
 # Health and system endpoints
 @app.get(
-    "/",
+    "/api",
     tags=["system"],
     summary="API Root Information",
     description="""Returns basic information about the Cookie Licking Detector API including version, status, and available documentation links.
@@ -424,7 +478,7 @@ async def custom_redoc_html():
     """,
     response_description="API information and status"
 )
-async def root():
+async def api_root():
     """Get API root information and status."""
     return {
         "service": "Cookie Licking Detector",
@@ -432,7 +486,8 @@ async def root():
         "status": "operational",
         "environment": settings.ENVIRONMENT,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "docs_url": "/docs" if settings.DEBUG else "disabled",
+        "docs_url": "/docs",
+        "webapp_url": "/",
         "features": {
             "authentication": "JWT-based authentication",
             "monitoring": "Prometheus metrics" if settings.ENABLE_METRICS else "disabled",
@@ -499,20 +554,35 @@ async def health_check():
     **Usage:**
     Configure your Prometheus server to scrape this endpoint for comprehensive monitoring.
     
-    **Security:** This endpoint may contain sensitive operational data and should be secured appropriately in production.
+    **Security:** This endpoint requires admin authentication in production or when METRICS_EXPOSE_PUBLIC is not enabled.
     """,
     responses={
         200: {"description": "Prometheus metrics data"},
+        403: {"description": "Forbidden - Admin access required"},
         404: {"description": "Metrics disabled"}
     }
 )
-async def metrics():
-    """Get Prometheus metrics data."""
+async def metrics(current_user: User = Depends(get_current_user) if settings.ENVIRONMENT == "production" and not settings.METRICS_EXPOSE_PUBLIC else None):
+    """Get Prometheus metrics data with optional authentication."""
     if not settings.ENABLE_METRICS:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Metrics disabled"
         )
+    
+    # In production, require admin role unless METRICS_EXPOSE_PUBLIC is true
+    if settings.ENVIRONMENT == "production" and not settings.METRICS_EXPOSE_PUBLIC:
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required"
+            )
+        from app.db.models.user import UserRole
+        if UserRole.ADMIN.value not in current_user.roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin access required for metrics endpoint"
+            )
     
     metrics_data = get_metrics()
     return Response(
@@ -531,7 +601,7 @@ async def metrics():
     - Application version and build details
     - Runtime environment information
     - Enabled feature flags
-    - Dependency versions
+    - Dependency versions (read from actual installed packages)
     
     **Use cases:**
     - Deployment verification
@@ -542,13 +612,23 @@ async def metrics():
     response_description="Version and build information"
 )
 async def version_info():
-    """Get application version and build information."""
+    """Get application version and build information with actual runtime versions."""
+    import sys
+    import importlib.metadata
+    
+    def get_package_version(package_name: str) -> str:
+        """Get actual installed version of a package."""
+        try:
+            return importlib.metadata.version(package_name)
+        except importlib.metadata.PackageNotFoundError:
+            return "unknown"
+    
     return {
-        "version": "1.0.0",
-        "build_date": "2024-01-01",
-        "commit": "production",
+        "version": settings.APP_VERSION,
+        "build_date": "2024-01-01",  # Can be set during build with CI/CD
+        "commit": "production",      # Can be set during build with CI/CD
         "environment": settings.ENVIRONMENT,
-        "python_version": "3.13+",
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "api_version": "v1",
         "features": {
             "authentication": True,
@@ -561,11 +641,14 @@ async def version_info():
             "audit_logging": True
         },
         "dependencies": {
-            "fastapi": "0.110+",
-            "sqlalchemy": "2.0+",
-            "celery": "5.3+",
-            "redis": "5.0+",
-            "postgresql": "13+"
+            "fastapi": get_package_version("fastapi"),
+            "sqlalchemy": get_package_version("sqlalchemy"),
+            "celery": get_package_version("celery"),
+            "redis": get_package_version("redis"),
+            "psycopg2": get_package_version("psycopg2-binary"),
+            "pydantic": get_package_version("pydantic"),
+            "uvicorn": get_package_version("uvicorn"),
+            "httpx": get_package_version("httpx")
         }
     }
 

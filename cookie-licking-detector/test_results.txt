@@ -1,0 +1,384 @@
+/Users/void/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+[92m✓ Backend is running[0m
+
+[94m================================================================================[0m
+[94m                🍪 COOKIE LICKING DETECTOR - API ENDPOINT TESTS 🍪                [0m
+[94m================================================================================[0m
+
+[94mTesting Backend at:[0m http://localhost:8000
+[94mStarted:[0m 2025-11-05 21:33:38
+
+
+[94m================================================================================[0m
+[94m                                SYSTEM ENDPOINTS                                [0m
+[94m================================================================================[0m
+
+[93mTesting:[0m GET /
+[93mName:[0m API Root Information
+[92m✓ PASSED[0m - Status: 200
+  Response: {
+  "service": "Cookie Licking Detector",
+  "version": "1.0.0",
+  "status": "operational",
+  "environment": "development",
+  "timestamp": "2025-11-05T16:03:38.277924+00:00",
+  "docs_url": "/docs",
+  "
+
+[93mTesting:[0m GET /health
+[93mName:[0m System Health Check
+[91m✗ FAILED[0m - Status: 503
+  Error: {
+  "status": "unhealthy",
+  "timestamp": 1762358621.679302,
+  "summary": {
+    "total_checks": 5,
+    "healthy_checks": 3,
+    "critical_failures": 1,
+    "optional_failures": 1,
+    "message": "3/5 
+
+[93mTesting:[0m GET /version
+[93mName:[0m Version Information
+[92m✓ PASSED[0m - Status: 200
+  Response: {
+  "version": "1.0.0",
+  "build_date": "2024-01-01",
+  "commit": "production",
+  "environment": "development",
+  "python_version": "3.13+",
+  "api_version": "v1",
+  "features": {
+    "authentication"
+
+[93mTesting:[0m GET /metrics
+[93mName:[0m Prometheus Metrics
+[92m✓ PASSED[0m - Status: 200
+  Response: # HELP http_requests_total Total HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{endpoint="/",method="GET",status_code="200"} 4.0
+http_requests_total{endpoint="/health",method="GE
+
+[93mTesting:[0m GET /docs
+[93mName:[0m Swagger UI Documentation
+[92m✓ PASSED[0m - Status: 200
+  Response: 
+<!DOCTYPE html>
+<html>
+<head>
+    <link type="text/css" rel="stylesheet" href="/static/swagger-ui/swagger-ui.css">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <title>Cookie Licking Detecto
+
+[93mTesting:[0m GET /redoc
+[93mName:[0m ReDoc Documentation
+[92m✓ PASSED[0m - Status: 200
+  Response: 
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cookie Licking Detector API - Documentation</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <
+
+[93mTesting:[0m GET /openapi.json
+[93mName:[0m OpenAPI Specification
+[92m✓ PASSED[0m - Status: 200
+  Response: {
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Cookie Licking Detector API",
+    "description": "Enterprise platform for detecting and managing stale issue claims in GitHub repositories.\n    \n\ud
+
+
+[94m================================================================================[0m
+[94m                            AUTHENTICATION ENDPOINTS                            [0m
+[94m================================================================================[0m
+
+[93mTesting:[0m POST /auth/register
+[93mName:[0m Register New User
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/auth/register",
+  "timestamp": "2025-11-05T16:03:41.787650+00:00"
+}
+
+[93mTesting:[0m POST /auth/login
+[93mName:[0m User Login
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/auth/login",
+  "timestamp": "2025-11-05T16:03:41.789397+00:00"
+}
+
+[93mTesting:[0m GET /auth/me
+[93mName:[0m Get Current User Info
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/auth/me",
+  "timestamp": "2025-11-05T16:03:41.791673+00:00"
+}
+
+[93mTesting:[0m GET /auth/api-keys
+[93mName:[0m List API Keys
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/auth/api-keys",
+  "timestamp": "2025-11-05T16:03:41.793857+00:00"
+}
+
+[93mTesting:[0m POST /auth/api-keys
+[93mName:[0m Create API Key
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/auth/api-keys",
+  "timestamp": "2025-11-05T16:03:41.795689+00:00"
+}
+
+[93mTesting:[0m POST /auth/logout
+[93mName:[0m User Logout
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/auth/logout",
+  "timestamp": "2025-11-05T16:03:41.797317+00:00"
+}
+
+
+[94m================================================================================[0m
+[94m                                 USER ENDPOINTS                                 [0m
+[94m================================================================================[0m
+
+[93mTesting:[0m GET /users/me
+[93mName:[0m Get Current User Profile
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/users/me",
+  "timestamp": "2025-11-05T16:03:41.798961+00:00"
+}
+
+[93mTesting:[0m GET /users/me/preferences
+[93mName:[0m Get User Preferences
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/users/me/preferences",
+  "timestamp": "2025-11-05T16:03:41.800512+00:00"
+}
+
+[93mTesting:[0m PUT /users/me
+[93mName:[0m Update User Profile
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/users/me",
+  "timestamp": "2025-11-05T16:03:41.802217+00:00"
+}
+
+
+[94m================================================================================[0m
+[94m                              REPOSITORY ENDPOINTS                              [0m
+[94m================================================================================[0m
+
+[93mTesting:[0m GET /repositories
+[93mName:[0m List Repositories
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/repositories",
+  "timestamp": "2025-11-05T16:03:41.806692+00:00"
+}
+
+[93mTesting:[0m POST /repositories
+[93mName:[0m Register Repository
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/repositories",
+  "timestamp": "2025-11-05T16:03:41.809189+00:00"
+}
+
+
+[94m================================================================================[0m
+[94m                                CLAIMS ENDPOINTS                                [0m
+[94m================================================================================[0m
+
+[93mTesting:[0m GET /claims
+[93mName:[0m List All Claims
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/claims",
+  "timestamp": "2025-11-05T16:03:41.811139+00:00"
+}
+
+[93mTesting:[0m GET /claims/1
+[93mName:[0m Get Claim Details
+[92m✓ PASSED[0m - Status: 404
+  Response: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/claims/1",
+  "timestamp": "2025-11-05T16:03:41.815133+00:00"
+}
+
+
+[94m================================================================================[0m
+[94m                              DASHBOARD ENDPOINTS                               [0m
+[94m================================================================================[0m
+
+[93mTesting:[0m GET /dashboard/stats
+[93mName:[0m Dashboard Statistics
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/dashboard/stats",
+  "timestamp": "2025-11-05T16:03:41.819041+00:00"
+}
+
+[93mTesting:[0m GET /dashboard/repositories
+[93mName:[0m Repository Metrics
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/dashboard/repositories",
+  "timestamp": "2025-11-05T16:03:41.821416+00:00"
+}
+
+[93mTesting:[0m GET /dashboard/users
+[93mName:[0m User Metrics
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/dashboard/users",
+  "timestamp": "2025-11-05T16:03:41.823456+00:00"
+}
+
+[93mTesting:[0m GET /dashboard/activity
+[93mName:[0m Recent Activity Feed
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/dashboard/activity",
+  "timestamp": "2025-11-05T16:03:41.826050+00:00"
+}
+
+
+[94m================================================================================[0m
+[94m                               SETTINGS ENDPOINTS                               [0m
+[94m================================================================================[0m
+
+[93mTesting:[0m GET /settings
+[93mName:[0m Get System Settings
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/settings",
+  "timestamp": "2025-11-05T16:03:41.829407+00:00"
+}
+
+[93mTesting:[0m GET /system/stats
+[93mName:[0m System Statistics
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/system/stats",
+  "timestamp": "2025-11-05T16:03:41.881649+00:00"
+}
+
+[93mTesting:[0m GET /system/health
+[93mName:[0m System Health Status
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/system/health",
+  "timestamp": "2025-11-05T16:03:41.884695+00:00"
+}
+
+
+[94m================================================================================[0m
+[94m                               WEBHOOK ENDPOINTS                                [0m
+[94m================================================================================[0m
+
+[93mTesting:[0m GET /webhooks/health
+[93mName:[0m Webhook Service Health
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/webhooks/health",
+  "timestamp": "2025-11-05T16:03:41.886475+00:00"
+}
+
+[93mTesting:[0m POST /webhooks/test
+[93mName:[0m Test Webhook Endpoint
+[91m✗ FAILED[0m - Status: 404
+  Error: {
+  "error": "Resource not found",
+  "message": "The requested resource could not be found",
+  "path": "/webhooks/test",
+  "timestamp": "2025-11-05T16:03:41.888564+00:00"
+}
+
+
+[94m================================================================================[0m
+[94m                                  TEST SUMMARY                                  [0m
+[94m================================================================================[0m
+
+[94mTotal Endpoints Tested:[0m 29
+[92mPassed:[0m 7
+[91mFailed:[0m 22
+[93mPass Rate:[0m 24.1%
+
+[91mFailed Endpoints:[0m
+  [91m✗[0m GET /health
+  [91m✗[0m POST /api/v1/auth/register
+  [91m✗[0m POST /api/v1/auth/login
+  [91m✗[0m GET /api/v1/auth/me
+  [91m✗[0m GET /api/v1/auth/api-keys
+  [91m✗[0m POST /api/v1/auth/api-keys
+  [91m✗[0m POST /api/v1/auth/logout
+  [91m✗[0m GET /api/v1/users/me
+  [91m✗[0m GET /api/v1/users/me/preferences
+  [91m✗[0m PUT /api/v1/users/me
+  [91m✗[0m GET /api/v1/repositories
+  [91m✗[0m POST /api/v1/repositories
+  [91m✗[0m GET /api/v1/claims
+  [91m✗[0m GET /api/v1/dashboard/stats
+  [91m✗[0m GET /api/v1/dashboard/repositories
+  [91m✗[0m GET /api/v1/dashboard/users
+  [91m✗[0m GET /api/v1/dashboard/activity
+  [91m✗[0m GET /api/v1/settings
+  [91m✗[0m GET /api/v1/system/stats
+  [91m✗[0m GET /api/v1/system/health
+  [91m✗[0m GET /api/v1/webhooks/health
+  [91m✗[0m POST /api/v1/webhooks/test
+
+[94mCompleted:[0m 2025-11-05 21:33:41

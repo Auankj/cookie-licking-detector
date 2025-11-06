@@ -122,6 +122,7 @@ class Settings(BaseSettings):
     HEALTH_CHECK_TIMEOUT: int = Field(default=30, env="HEALTH_CHECK_TIMEOUT")  # seconds
     METRICS_ENABLED: bool = Field(default=True, env="METRICS_ENABLED")
     ENABLE_METRICS: bool = Field(default=True, env="ENABLE_METRICS")  # Alias for backwards compatibility
+    METRICS_EXPOSE_PUBLIC: bool = Field(default=False, env="METRICS_EXPOSE_PUBLIC")  # Allow public access to /metrics endpoint
     SENTRY_DSN: Optional[str] = Field(default=None, env="SENTRY_DSN")
     
     # Performance Settings

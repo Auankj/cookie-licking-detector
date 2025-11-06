@@ -7,7 +7,9 @@ import os
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.pool import QueuePool, StaticPool
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_settings
 
@@ -134,24 +136,20 @@ async def close_db():
 
 # Legacy sync session for backward compatibility (if needed)
 def get_db():
-    """Legacy sync database session for existing sync routes."""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker, Session
+    """
+    Legacy sync database session for existing sync routes.
+    Creates a synchronous SQLAlchemy session.
+    """
+    from app.core.config import get_settings
+    settings = get_settings()
     
-    # Create sync engine for legacy compatibility
     sync_engine = create_engine(
         settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://"),
-        poolclass=QueuePool,
-        pool_size=5,
-        max_overflow=10,
-        pool_pre_ping=True,
-        pool_recycle=300
+        poolclass=StaticPool,
     )
-    
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
-    
-    session = SessionLocal()
+    db = SessionLocal()
     try:
-        yield session
+        yield db
     finally:
-        session.close()
+        db.close()

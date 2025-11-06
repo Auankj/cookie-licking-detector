@@ -201,27 +201,39 @@ class HealthChecker:
         """Check database connectivity and performance."""
         try:
             start_time = time.time()
-            async_session_gen = get_async_session()
-            session = await anext(async_session_gen)
             
-            try:
-                result = await session.execute(text("SELECT 1"))
-                row = result.fetchone()
-                duration = time.time() - start_time
-                
-                if row and row[0] == 1:
-                    return {
-                        'status': 'healthy',
-                        'response_time_ms': duration * 1000,
-                        'message': 'Database connection successful'
-                    }
-                else:
+            # Get session factory and create a session properly
+            from app.db.database import get_async_session_factory
+            session_factory = get_async_session_factory()
+            
+            if not session_factory:
+                return {
+                    'status': 'unhealthy',
+                    'message': 'Database session factory not initialized'
+                }
+            
+            async with session_factory() as session:
+                try:
+                    result = await session.execute(text("SELECT 1"))
+                    row = result.fetchone()
+                    duration = time.time() - start_time
+                    
+                    if row and row[0] == 1:
+                        return {
+                            'status': 'healthy',
+                            'response_time_ms': duration * 1000,
+                            'message': 'Database connection successful'
+                        }
+                    else:
+                        return {
+                            'status': 'unhealthy',
+                            'message': 'Database query returned unexpected result'
+                        }
+                except Exception as inner_e:
                     return {
                         'status': 'unhealthy',
-                        'message': 'Database query returned unexpected result'
+                        'message': f'Database query failed: {str(inner_e)}'
                     }
-            finally:
-                await session.close()
                 
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
@@ -231,7 +243,7 @@ class HealthChecker:
             }
     
     async def check_redis(self) -> Dict[str, Any]:
-        """Check Redis connectivity."""
+        """Check Redis connectivity using async-safe approach."""
         try:
             if not self._redis_client:
                 self._redis_client = redis.from_url(
@@ -240,7 +252,11 @@ class HealthChecker:
                 )
             
             start_time = time.time()
-            pong = self._redis_client.ping()
+            
+            # Use asyncio.to_thread to avoid blocking the event loop
+            import asyncio
+            pong = await asyncio.to_thread(self._redis_client.ping)
+            
             duration = time.time() - start_time
             
             if pong:

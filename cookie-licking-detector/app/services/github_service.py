@@ -253,6 +253,58 @@ class GitHubAPIService:
             logger.error(f"Unexpected error posting comment to {owner}/{name}#{issue_number}: {e}")
             raise
 
+    async def post_nudge_comment(self, repo_full_name: str, issue_number: int, username: str, nudge_count: int) -> bool:
+        """Post a nudge comment on GitHub issue"""
+        
+        try:
+            owner, name = repo_full_name.split("/", 1)
+            
+            body = f"""@{username}, friendly reminder! 👋
+
+This is nudge #{nudge_count} regarding your claim on this issue.
+
+We haven't seen any activity recently. If you're still working on this, please:
+- Link a PR that addresses this issue
+- Post an update on your progress
+- Let us know if you need any help
+
+If you're no longer able to work on this, please let us know so others can contribute.
+
+Thanks for being part of our community! 🙏"""
+            
+            await self.post_issue_comment(owner, name, issue_number, body)
+            logger.info(f"Posted nudge comment for {username} on {repo_full_name}#{issue_number}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to post nudge comment: {e}")
+            return False
+
+    async def post_auto_release_comment(self, repo_full_name: str, issue_number: int, username: str, claim_duration_days: int, nudge_count: int) -> bool:
+        """Post an auto-release comment on GitHub issue"""
+        
+        try:
+            owner, name = repo_full_name.split("/", 1)
+            
+            body = f"""This issue has been automatically released from @{username}'s claim.
+
+**Summary:**
+- Claim duration: {claim_duration_days} days
+- Nudges sent: {nudge_count}
+- No activity detected after multiple reminders
+
+This issue is now available for other contributors. If @{username} would still like to work on this, feel free to comment again!
+
+Thank you to everyone interested in contributing! 🎉"""
+            
+            await self.post_issue_comment(owner, name, issue_number, body)
+            logger.info(f"Posted auto-release comment for {username} on {repo_full_name}#{issue_number}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to post auto-release comment: {e}")
+            return False
+
     async def assign_issue(self, owner: str, name: str, issue_number: int, assignees: List[str]) -> bool:
         """Assign users to an issue"""
         
@@ -269,19 +321,22 @@ class GitHubAPIService:
             repo = self.github.get_repo(f"{owner}/{name}")
             issue = repo.get_issue(issue_number)
             
-            # Get user objects
-            user_objects = []
+            # Validate usernames exist before assigning
+            valid_usernames = []
             for username in assignees:
                 try:
+                    # Verify user exists
                     user = self.github.get_user(username)
-                    user_objects.append(user)
+                    # PyGithub expects username strings, not user objects
+                    valid_usernames.append(username)
                 except GithubException as e:
                     logger.warning(f"Could not find user {username}: {e}")
                     continue
             
-            if user_objects:
-                issue.edit(assignees=user_objects)
-                logger.info(f"Assigned {assignees} to issue {owner}/{name}#{issue_number}")
+            if valid_usernames:
+                # Pass username strings, not user objects
+                issue.edit(assignees=valid_usernames)
+                logger.info(f"Assigned {valid_usernames} to issue {owner}/{name}#{issue_number}")
                 return True
             else:
                 logger.warning(f"No valid assignees found for {owner}/{name}#{issue_number}")
@@ -303,11 +358,12 @@ class GitHubAPIService:
             repo = self.github.get_repo(f"{owner}/{name}")
             issue = repo.get_issue(issue_number)
             
-            # Get current assignees
-            current_assignees = [assignee for assignee in issue.assignees 
+            # Get current assignees as list of username strings
+            current_usernames = [assignee.login for assignee in issue.assignees 
                                if assignee.login != username]
             
-            issue.edit(assignees=current_assignees)
+            # PyGithub expects username strings, not user objects
+            issue.edit(assignees=current_usernames)
             logger.info(f"Unassigned {username} from issue {owner}/{name}#{issue_number}")
             return True
                 
@@ -444,7 +500,12 @@ class GitHubAPIService:
             raise
 
     async def verify_webhook_signature(self, payload: bytes, signature: str, secret: str) -> bool:
-        """Verify GitHub webhook signature"""
+        """
+        Verify GitHub webhook signature using SHA-256.
+        
+        GitHub now uses SHA-256 for webhook signatures (X-Hub-Signature-256 header).
+        Format: 'sha256=<hex_digest>'
+        """
         
         import hmac
         import hashlib
@@ -453,14 +514,15 @@ class GitHubAPIService:
             return False
         
         try:
-            # GitHub sends signature as 'sha1=<signature>'
+            # GitHub sends signature as 'sha256=<signature>' (SHA-256, not SHA-1)
             expected_signature = hmac.new(
                 secret.encode('utf-8'),
                 payload,
-                hashlib.sha1
+                hashlib.sha256  # Use SHA-256, not SHA-1
             ).hexdigest()
             
-            signature = signature.replace('sha1=', '')
+            # Remove 'sha256=' prefix if present
+            signature = signature.replace('sha256=', '')
             
             return hmac.compare_digest(signature, expected_signature)
             

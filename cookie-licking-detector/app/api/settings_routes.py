@@ -10,7 +10,8 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from app.db.database import get_async_session
-from app.db.models import Repository
+from app.db.models import Repository, User
+from app.core.security import get_current_user, require_admin
 
 router = APIRouter()
 
@@ -45,29 +46,50 @@ class SystemStats(BaseModel):
     database_size: str
     cache_hit_rate: float
 
-# Global settings store (in production, this would be in database)
+# Global settings store (in production, this should be in database table: system_settings)
+# TODO: Migrate to database-backed storage for production scale-out
 _system_settings = SystemSettingsModel()
 
 @router.get("/settings", response_model=SystemSettingsModel)
-async def get_settings():
+async def get_settings(current_user: User = Depends(require_admin)):
     """
-    Get current system settings
+    Get current system settings (admin only)
     """
     return _system_settings
 
 @router.put("/settings", response_model=SystemSettingsModel)
-async def update_settings(settings: SystemSettingsModel):
+async def update_settings(
+    settings: SystemSettingsModel,
+    current_user: User = Depends(require_admin)
+):
     """
-    Update system settings
+    Update system settings (admin only)
     """
     global _system_settings
+    
+    # Basic validation
+    if settings.claim_timeout_hours < 1 or settings.claim_timeout_hours > 168:
+        raise HTTPException(
+            status_code=400,
+            detail="claim_timeout_hours must be between 1 and 168 hours"
+        )
+    
+    if settings.max_claims_per_user < 1 or settings.max_claims_per_user > 10:
+        raise HTTPException(
+            status_code=400,
+            detail="max_claims_per_user must be between 1 and 10"
+        )
+    
     _system_settings = settings
     return _system_settings
 
 @router.get("/system/stats", response_model=SystemStats)
-async def get_system_stats(db: AsyncSession = Depends(get_async_session)):
+async def get_system_stats(
+    db: AsyncSession = Depends(get_async_session),
+    current_user: User = Depends(require_admin)
+):
     """
-    Get system performance statistics
+    Get system performance statistics (admin only)
     """
     
     # Get database statistics
@@ -91,9 +113,9 @@ async def get_system_stats(db: AsyncSession = Depends(get_async_session)):
     return stats
 
 @router.post("/system/restart")
-async def restart_system():
+async def restart_system(current_user: User = Depends(require_admin)):
     """
-    Restart system (mock endpoint)
+    Restart system (mock endpoint) - admin only
     In production, this would trigger a graceful restart
     """
     return {
@@ -105,7 +127,7 @@ async def restart_system():
 @router.get("/system/health")
 async def get_system_health(db: AsyncSession = Depends(get_async_session)):
     """
-    Get system health status
+    Get system health status (public endpoint)
     """
     try:
         # Test database connection

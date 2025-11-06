@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍪 Cookie-Licking Detector - Dashboard</title>
+    <link rel="stylesheet" href="/static/webapp/styles.css">
+    <link rel="shortcut icon" href="/favicon.ico">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="logo">🍪</span>
+                <span class="brand-name">Cookie-Licking Detector</span>
+            </div>
+            <div class="nav-menu">
+                <a href="#dashboard" class="nav-link active" data-page="dashboard">Dashboard</a>
+                <a href="#repositories" class="nav-link" data-page="repositories">Repositories</a>
+                <a href="#claims" class="nav-link" data-page="claims">Claims</a>
+                <a href="#analytics" class="nav-link" data-page="analytics">Analytics</a>
+                <a href="#api" class="nav-link" data-page="api">API Docs</a>
+            </div>
+            <div class="nav-actions">
+                <button id="loginBtn" class="btn btn-primary">Login</button>
+                <div id="userMenu" class="user-menu" style="display: none;">
+                    <span id="username"></span>
+                    <button id="logoutBtn" class="btn btn-secondary">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Page -->
+        <div id="dashboard-page" class="page active">
+            <div class="page-header">
+                <h1>📊 System Dashboard</h1>
+                <p>Real-time overview of cookie-licking detection system</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">📦</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="totalRepos">-</div>
+                        <div class="stat-label">Total Repositories</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="activeClaims">-</div>
+                        <div class="stat-label">Active Claims</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="completedClaims">-</div>
+                        <div class="stat-label">Completed Claims</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🔔</div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="totalNudges">-</div>
+                        <div class="stat-label">Nudges Sent</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>📈 Claims Trend (Last 30 Days)</h3>
+                    <div id="claimsTrendChart" class="chart-container"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>📊 Claim Status Distribution</h3>
+                    <div id="claimStatusChart" class="chart-container"></div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="activity-section">
+                <h2>🕒 Recent Activity</h2>
+                <div id="recentActivity" class="activity-list">
+                    <!-- Activity items will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Repositories Page -->
+        <div id="repositories-page" class="page">
+            <div class="page-header">
+                <h1>📦 Monitored Repositories</h1>
+                <button id="addRepoBtn" class="btn btn-primary">+ Add Repository</button>
+            </div>
+
+            <div class="filters">
+                <input type="text" id="repoSearch" placeholder="Search repositories..." class="search-input">
+                <select id="repoFilter" class="filter-select">
+                    <option value="all">All Repositories</option>
+                    <option value="monitored">Monitored</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+
+            <div id="repositoriesList" class="repos-grid">
+                <!-- Repositories will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Claims Page -->
+        <div id="claims-page" class="page">
+            <div class="page-header">
+                <h1>🎯 Issue Claims</h1>
+                <p>Track and manage all issue claims across repositories</p>
+            </div>
+
+            <div class="filters">
+                <input type="text" id="claimSearch" placeholder="Search claims..." class="search-input">
+                <select id="claimStatusFilter" class="filter-select">
+                    <option value="all">All Claims</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                    <option value="released">Released</option>
+                    <option value="expired">Expired</option>
+                </select>
+            </div>
+
+            <div id="claimsList" class="claims-list">
+                <!-- Claims will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Analytics Page -->
+        <div id="analytics-page" class="page">
+            <div class="page-header">
+                <h1>📈 Analytics & Insights</h1>
+                <p>Deep dive into system performance and patterns</p>
+            </div>
+
+            <div class="analytics-grid">
+                <div class="analytics-card">
+                    <h3>⏱️ Average Claim Duration</h3>
+                    <div class="analytics-value" id="avgDuration">-</div>
+                </div>
+                <div class="analytics-card">
+                    <h3>🎯 Completion Rate</h3>
+                    <div class="analytics-value" id="completionRate">-</div>
+                </div>
+                <div class="analytics-card">
+                    <h3>📊 Detection Accuracy</h3>
+                    <div class="analytics-value" id="detectionAccuracy">-</div>
+                </div>
+                <div class="analytics-card">
+                    <h3>👥 Active Contributors</h3>
+                    <div class="analytics-value" id="activeContributors">-</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>🔥 Top Contributors</h3>
+                    <div id="topContributorsChart" class="chart-container"></div>
+                </div>
+                <div class="chart-card">
+                    <h3>⏰ Response Time Distribution</h3>
+                    <div id="responseTimeChart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Docs Page -->
+        <div id="api-page" class="page">
+            <div class="page-header">
+                <h1>📚 API Documentation</h1>
+                <p>Access interactive API documentation and specifications</p>
+            </div>
+
+            <div class="api-links-grid">
+                <a href="/docs" target="_blank" class="api-link-card">
+                    <div class="api-icon">📋</div>
+                    <h3>Swagger UI</h3>
+                    <p>Interactive API documentation with testing capabilities</p>
+                    <span class="btn btn-primary">Open Swagger UI →</span>
+                </a>
+
+                <a href="/redoc" target="_blank" class="api-link-card">
+                    <div class="api-icon">📖</div>
+                    <h3>ReDoc</h3>
+                    <p>Clean, responsive API documentation</p>
+                    <span class="btn btn-primary">Open ReDoc →</span>
+                </a>
+
+                <a href="/openapi.json" target="_blank" class="api-link-card">
+                    <div class="api-icon">📄</div>
+                    <h3>OpenAPI Spec</h3>
+                    <p>Raw OpenAPI 3.0 specification in JSON format</p>
+                    <span class="btn btn-primary">Download Spec →</span>
+                </a>
+
+                <a href="/health" target="_blank" class="api-link-card">
+                    <div class="api-icon">🏥</div>
+                    <h3>Health Check</h3>
+                    <p>Monitor API health and system status</p>
+                    <span class="btn btn-primary">Check Health →</span>
+                </a>
+            </div>
+
+            <div class="api-info">
+                <h2>🔑 API Authentication</h2>
+                <p>All API endpoints require authentication using JWT tokens.</p>
+                <pre><code>Authorization: Bearer &lt;your-jwt-token&gt;</code></pre>
+                
+                <h3>Quick Start</h3>
+                <ol>
+                    <li>Obtain an access token via <code>POST /api/v1/auth/login</code></li>
+                    <li>Include the token in the Authorization header</li>
+                    <li>Start making API requests!</li>
+                </ol>
+            </div>
+        </div>
+    </main>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>🔐 Login</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginUsername">Username</label>
+                    <input type="text" id="loginUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Login</button>
+            </form>
+            <div id="loginError" class="error-message"></div>
+        </div>
+    </div>
+
+    <!-- Add Repository Modal -->
+    <div id="addRepoModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>➕ Add Repository</h2>
+            <form id="addRepoForm">
+                <div class="form-group">
+                    <label for="repoOwner">Repository Owner</label>
+                    <input type="text" id="repoOwner" placeholder="e.g., facebook" required>
+                </div>
+                <div class="form-group">
+                    <label for="repoName">Repository Name</label>
+                    <input type="text" id="repoName" placeholder="e.g., react" required>
+                </div>
+                <div class="form-group">
+                    <label for="gracePeriod">Grace Period (days)</label>
+                    <input type="number" id="gracePeriod" value="7" min="1" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Add Repository</button>
+            </form>
+            <div id="addRepoError" class="error-message"></div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script src="/static/webapp/app.js"></script>
+</body>
+</html>

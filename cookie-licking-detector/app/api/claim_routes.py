@@ -65,44 +65,65 @@ async def list_claims(
     As specified in MD file: GET /api/claims
     """
     
-    # Build base query with joins
+    # Build base query filters to be reused
+    filters = []
+    
+    # Apply status filter
+    if status:
+        # Convert string status to enum - use explicit mapping instead of hasattr
+        STATUS_MAPPING = {
+            'active': ClaimStatus.ACTIVE,
+            'released': ClaimStatus.RELEASED,
+            'completed': ClaimStatus.COMPLETED,
+            'expired': ClaimStatus.EXPIRED
+        }
+        
+        status_lower = status.lower()
+        if status_lower not in STATUS_MAPPING:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status filter: {status}. Valid values: {', '.join(STATUS_MAPPING.keys())}"
+            )
+        
+        status_enum = STATUS_MAPPING[status_lower]
+        filters.append(Claim.status == status_enum)
+    
+    # Apply repo filter
+    if repo and "/" in repo:
+        owner, name = repo.split("/", 1)
+        filters.append(Repository.owner_name == owner)
+        filters.append(Repository.name == name)
+    
+    # Apply user filter
+    if user:
+        filters.append(Claim.github_username.ilike(f"%{user}%"))
+    
+    # Build single base query for counting
+    base_query = select(Claim.id).join(
+        Issue, Claim.issue_id == Issue.id
+    ).join(
+        Repository, Issue.repository_id == Repository.id
+    )
+    
+    # Apply all filters to base query
+    if filters:
+        base_query = base_query.where(*filters)
+    
+    # Get total count using the base query
+    count_stmt = select(func.count()).select_from(base_query.subquery())
+    count_result = await db.execute(count_stmt)
+    total_count = count_result.scalar()
+    
+    # Build data query with same filters
     stmt = select(Claim, Issue, Repository).join(
         Issue, Claim.issue_id == Issue.id
     ).join(
         Repository, Issue.repository_id == Repository.id
     )
     
-    # Apply filters
-    if status:
-        # Convert string status to enum if needed
-        status_enum = ClaimStatus(status) if hasattr(ClaimStatus, status.upper()) else status
-        stmt = stmt.where(Claim.status == status_enum)
-    
-    if repo:
-        if "/" in repo:
-            owner, name = repo.split("/", 1)
-            stmt = stmt.where(Repository.owner_name == owner, Repository.name == name)
-    
-    if user:
-        stmt = stmt.where(Claim.github_username.ilike(f"%{user}%"))
-    
-    # Get total count - use the same join pattern as the main query
-    count_stmt = select(func.count(Claim.id)).select_from(
-        Claim.__table__.join(Issue.__table__, Claim.issue_id == Issue.id).join(
-            Repository.__table__, Issue.repository_id == Repository.id
-        )
-    )
-    if status:
-        status_enum = ClaimStatus(status) if hasattr(ClaimStatus, status.upper()) else status
-        count_stmt = count_stmt.where(Claim.status == status_enum)
-    if repo and "/" in repo:
-        owner, name = repo.split("/", 1)
-        count_stmt = count_stmt.where(Repository.owner_name == owner, Repository.name == name)
-    if user:
-        count_stmt = count_stmt.where(Claim.github_username.ilike(f"%{user}%"))
-    
-    count_result = await db.execute(count_stmt)
-    total_count = count_result.scalar()
+    # Apply same filters to data query
+    if filters:
+        stmt = stmt.where(*filters)
     
     # Apply pagination
     offset = (page - 1) * per_page
@@ -120,7 +141,7 @@ async def list_claims(
             github_username=claim.github_username,
             claim_text=claim.claim_text,
             claim_timestamp=claim.claim_timestamp,
-            status=claim.status.value if hasattr(claim.status, 'value') else claim.status,
+            status=claim.status.value,  # Always return .value for consistent JSON serialization
             confidence_score=claim.confidence_score,
             first_nudge_sent_at=claim.first_nudge_sent_at,
             last_activity_timestamp=claim.last_activity_timestamp,
@@ -194,7 +215,7 @@ async def get_claim_details(
             "github_username": claim.github_username,
             "claim_text": claim.claim_text,
             "claim_timestamp": claim.claim_timestamp.isoformat(),
-            "status": claim.status,
+            "status": claim.status.value,  # Always return .value for consistent JSON serialization
             "confidence_score": claim.confidence_score,
             "context_metadata": claim.context_metadata,
             "first_nudge_sent_at": claim.first_nudge_sent_at.isoformat() if claim.first_nudge_sent_at else None,
@@ -207,7 +228,7 @@ async def get_claim_details(
             "github_issue_number": issue.github_issue_number,
             "title": issue.title,
             "description": issue.description,
-            "status": issue.status.value if hasattr(issue.status, 'value') else issue.status,
+            "status": issue.status.value,  # Always return .value for consistent JSON serialization
             "repository": f"{repository.owner_name}/{repository.name}" if repository else None
         } if issue else None,
         "activity_history": activity_history
@@ -237,7 +258,7 @@ async def manually_send_nudge(
     if claim.status != ClaimStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot nudge claim with status: {claim.status.value}"
+            detail=f"Cannot nudge claim with status: {claim.status.value}"  # Return .value for error messages
         )
     
     try:
@@ -292,10 +313,10 @@ async def manually_release_claim(
             detail=f"Claim {claim_id} not found"
         )
     
-    if claim.status not in [ClaimStatus.ACTIVE, "active", "inactive"]:
+    if claim.status != ClaimStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot release claim with status: {claim.status}"
+            detail=f"Cannot release claim with status: {claim.status.value}"
         )
     
     try:

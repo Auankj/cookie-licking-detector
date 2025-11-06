@@ -534,17 +534,40 @@ def verify_token(token: str) -> TokenData:
     return jwt_manager.verify_token(token)
 
 # Security headers middleware
-def add_security_headers(response):
-    """Add security headers to response."""
+def add_security_headers(response, request_path: str = None):
+    """
+    Add security headers to response.
+    
+    Applies relaxed CSP (with unsafe-inline) only for exact documentation routes.
+    Uses strict CSP for all other routes to prevent XSS attacks.
+    """
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: https:; "
-        "connect-src 'self';"
-    )
+    
+    # Only relax CSP for exact documentation paths
+    is_docs_route = False
+    if request_path:
+        is_docs_route = request_path in ['/docs', '/redoc', '/openapi.json']
+    
+    if is_docs_route:
+        # Relaxed CSP for documentation only - Swagger/ReDoc require unsafe-inline and unsafe-eval
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "  # unsafe-eval needed for Swagger
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self';"
+        )
+    else:
+        # Strict CSP for all other routes - no unsafe-inline
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "  # No unsafe-inline for better security
+            "style-src 'self'; "   # No unsafe-inline for better security
+            "img-src 'self' data: https:; "
+            "connect-src 'self';"
+        )
+    
     return response
